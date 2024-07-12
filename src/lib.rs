@@ -1,5 +1,6 @@
 use core::str;
 use itertools::Itertools;
+use rand::seq::SliceRandom;
 use std::{
     env::args,
     io::{self, Read},
@@ -17,13 +18,8 @@ const CRAB: &str = r###"
 const DEFAULT_WIDTH: usize = 80;
 
 pub fn get_input() -> Result<Vec<String>, io::Error> {
-    let mut lines: Vec<String> = args()
-        .skip(1)
-        .collect::<String>()
-        .split('\n')
-        .filter(|s| !s.is_empty())
-        .map(String::from)
-        .collect();
+    let mut lines: Vec<String> = args().skip(1).filter(|s| !s.is_empty()).collect();
+
     if lines.is_empty() {
         let mut input = String::new();
         io::stdin().read_to_string(&mut input)?;
@@ -32,12 +28,57 @@ pub fn get_input() -> Result<Vec<String>, io::Error> {
             .map(String::from)
             .filter(|s| !s.is_empty())
             .collect();
+    } else {
+        match lines[0].as_ref() {
+            "--quote" => {
+                if lines.len() < 2 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "No quote file provided",
+                    ));
+                }
+                let quote_text = read_quote_file(&lines[1])?;
+                lines = quote_text
+                    .split('\n')
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_string())
+                    .collect();
+            }
+            "--help" => {
+                lines = vec![
+                    "Usage: crabsay [OPTION] [MESSAGE]".to_string(),
+                    "Options:".to_string(),
+                    "  --quote [FILE]  Display a random quote from FILE".to_string(),
+                    "  --help          Display this help message".to_string(),
+                ];
+            }
+            _ => {
+                lines = vec![lines.join(" ")];
+            }
+        }
     }
     Ok(lines)
 }
 
-pub fn get_terminal_width() -> usize {
+fn read_quote_file(file: &str) -> io::Result<String> {
+    let mut quote = String::new();
+    io::BufReader::new(std::fs::File::open(file)?).read_to_string(&mut quote)?;
+    let quotes = quote
+        .split("\n\n")
+        .map(String::from)
+        .collect::<Vec<String>>();
+    let quote = quotes
+        .choose(&mut rand::thread_rng())
+        .unwrap_or(&"No quote found".to_string())
+        .to_string();
+    Ok(quote)
+}
+
+pub fn get_total_width() -> usize {
     let (width, _) = term_size::dimensions().unwrap_or((DEFAULT_WIDTH, 0));
+    if width > DEFAULT_WIDTH {
+        return DEFAULT_WIDTH;
+    }
     width
 }
 
@@ -144,14 +185,7 @@ pub fn make_boxed_text(input: Vec<String>, term_width: usize) -> String {
 mod test {
     use super::*;
     use rstest::rstest;
-    //#[test]
-    //fn test_make_boxed_text() {
-    //    let expected = format!(
-    //        " --------------- \n< Hello, World! >\n --------------- {}",
-    //        CRAB
-    //    );
-    //    assert_eq!(make_boxed_text("Hello, World!"), expected);
-    //}
+
     #[rstest]
     #[case::normal(vec!["aaaa", "aaaa", "aa"], 4)]
     #[case::exact(vec!["aaaa"], 4)]
