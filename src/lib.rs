@@ -89,7 +89,7 @@ pub fn is_valid_width(width: usize) -> bool {
 
 fn cut_line(line: &str, width: usize) -> Vec<String> {
     if line.len() <= width {
-        return vec![line.to_string()];
+        return vec![line.trim().to_string()];
     }
 
     let mut cut_lines = Vec::new();
@@ -130,7 +130,7 @@ fn cut_line(line: &str, width: usize) -> Vec<String> {
 }
 
 fn cut_word(word: &str, width: usize) -> Vec<String> {
-    if word.len() <= width {
+    if word.chars().count() <= width {
         return vec![word.to_string()];
     }
 
@@ -142,8 +142,13 @@ fn cut_word(word: &str, width: usize) -> Vec<String> {
 }
 
 fn format_final_line(line: &str, begin: &str, end: &str, width: usize) -> String {
-    let padding = " ".repeat(width - line.len() + 1);
+    assert!(line.chars().count() <= width);
+    let padding = " ".repeat(width - line.chars().count() + 1);
     format!("{} {}{}{}", begin, line, padding, end)
+}
+
+fn calculate_max_line_len(lines: &[String]) -> usize {
+    lines.iter().map(|s| s.chars().count()).max().unwrap_or(0)
 }
 
 pub fn make_boxed_text(input: Vec<String>, term_width: usize) -> String {
@@ -153,9 +158,15 @@ pub fn make_boxed_text(input: Vec<String>, term_width: usize) -> String {
     let extra_space = 4; // 'c ... c'
     let width = term_width - extra_space;
 
-    let all_lines: Vec<_> = input.iter().flat_map(|l| cut_line(l, width)).collect();
+    let all_lines: Vec<_> = input
+        .iter()
+        .flat_map(|l| cut_line(l, width))
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
 
-    let max_line_len = all_lines.iter().map(|l| l.len()).max().unwrap_or(0);
+    let max_line_len = calculate_max_line_len(&all_lines);
+    assert!(max_line_len <= width);
 
     let cap = "-".repeat(max_line_len + 2);
     let mut boxed_text = format!(" {} ", cap);
@@ -232,5 +243,42 @@ mod test {
             .collect();
         let cut = cut_line(line, 4);
         assert_eq!(cut, expected);
+    }
+    #[test]
+    fn test_cut_line_short_trim() {
+        let line = "aaa ";
+        let expected: Vec<String> = vec!["aaa".to_string()];
+        let cut = cut_line(line, 10);
+        assert_eq!(cut, expected);
+    }
+
+    #[rstest]
+    #[case::normal("aaaa", "<", ">", 4, "< aaaa >")]
+    #[case::empty_line("", "<", ">", 4, "<      >")]
+    #[case::exact_width("hello", "/", "\\", 5, "/ hello \\")]
+    #[case::trailing_spaces("world", "<", ">", 10, "< world      >")]
+    #[case::single_char("x", "(", ")", 1, "( x )")]
+    #[case::single_char_longer("x", "(", ")", 2, "( x  )")]
+    #[case::longer_padding("rust", "/", "\\", 10, "/ rust       \\")]
+    fn test_format_final_line(
+        #[case] line: &str,
+        #[case] begin: &str,
+        #[case] end: &str,
+        #[case] width: usize,
+        #[case] expected: &str,
+    ) {
+        let formatted = format_final_line(line, begin, end, width);
+        assert_eq!(formatted, expected);
+    }
+
+    #[rstest]
+    #[case::normal(vec!["hello", "world", "rust"], 5)]
+    #[case::empty(vec![], 0)]
+    #[case::single(vec!["hello"], 5)]
+    #[case::strange(vec!["\"Never trust a computer you can’t throw out a window.\"", "abc"], 54)]
+    fn test_calculate_max_line_len(#[case] lines: Vec<&str>, #[case] expected: usize) {
+        let lines: Vec<String> = lines.into_iter().map(|s| s.to_string()).collect();
+        let max = calculate_max_line_len(&lines);
+        assert_eq!(max, expected);
     }
 }
