@@ -4,10 +4,10 @@ use std::{
     process::exit,
 };
 
-use crabsay::{get_input, get_terminal_width, is_valid_width, make_boxed_text};
+use crabsay::{get_input, get_total_width, is_valid_width, make_boxed_text};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let width = get_terminal_width();
+    let width = get_total_width();
     if !is_valid_width(width) {
         eprintln!("Terminal too narrow to display crab");
         exit(1);
