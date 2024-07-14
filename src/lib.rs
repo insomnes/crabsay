@@ -4,7 +4,10 @@ use rand::seq::SliceRandom;
 use std::{
     env::args,
     io::{self, Read},
+    process::exit,
 };
+
+mod dance;
 
 const CRAB: &str = r###"
         \
@@ -51,6 +54,19 @@ pub fn get_input() -> Result<Vec<String>, io::Error> {
                     "  --quote [FILE]  Display a random quote from FILE".to_string(),
                     "  --help          Display this help message".to_string(),
                 ];
+            }
+            "--dance" => {
+                let cycles_count = if lines.len() > 1 {
+                    lines
+                        .get(1)
+                        .unwrap_or(&String::from("1"))
+                        .parse::<usize>()
+                        .unwrap_or(1)
+                } else {
+                    1
+                };
+                dance::dance_crab_dance(cycles_count)?;
+                exit(0);
             }
             _ => {
                 lines = vec![lines.join(" ")];
